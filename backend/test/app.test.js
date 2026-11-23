@@ -65,4 +65,13 @@ test('upload, listagem e download de documentos', async () => {
     `${baseUrl}/documents/unknown/download`,
   );
   assert.equal(missingDocumentResponse.status, 404);
+
+  for (let request = 0; request < 58; request += 1) {
+    const response = await fetch(`${baseUrl}/documents/unknown/download`);
+    assert.equal(response.status, 404);
+  }
+  const rateLimitedResponse = await fetch(
+    `${baseUrl}/documents/unknown/download`,
+  );
+  assert.equal(rateLimitedResponse.status, 429);
 });
