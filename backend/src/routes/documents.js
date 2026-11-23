@@ -1,46 +1,22 @@
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const { createDocumentController } = require('../controllers/documents');
-
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const RATE_LIMIT_MAX_REQUESTS = 60;
-
-function createRateLimiter() {
-  const requestsByIp = new Map();
-
-  return (req, res, next) => {
-    const now = Date.now();
-    for (const [ip, request] of requestsByIp) {
-      if (request.resetAt <= now) {
-        requestsByIp.delete(ip);
-      }
-    }
-
-    const request = requestsByIp.get(req.ip);
-    if (request && request.count >= RATE_LIMIT_MAX_REQUESTS) {
-      return res.status(429).json({ error: 'Limite de requisições excedido.' });
-    }
-
-    if (request) {
-      request.count += 1;
-    } else {
-      requestsByIp.set(req.ip, {
-        count: 1,
-        resetAt: now + RATE_LIMIT_WINDOW_MS,
-      });
-    }
-
-    return next();
-  };
-}
 
 function createDocumentRouter(service, storageDirectory) {
   const router = express.Router();
   const controller = createDocumentController(service);
-  const uploadRateLimiter = createRateLimiter();
-  const downloadRateLimiter = createRateLimiter();
+  const createFileRateLimiter = () => rateLimit({
+    windowMs: 60 * 1000,
+    limit: 60,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: { error: 'Limite de requisições excedido.' },
+  });
+  const uploadRateLimiter = createFileRateLimiter();
+  const downloadRateLimiter = createFileRateLimiter();
   const upload = multer({
     storage: multer.diskStorage({
       destination(_req, _file, callback) {
