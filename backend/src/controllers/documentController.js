@@ -1,5 +1,16 @@
 const documentService = require('../services/documentService');
 
+function toPublicDocument(document) {
+  return {
+    id: document.id,
+    originalName: document.originalName,
+    size: document.size,
+    uploadedAt: document.uploadedAt,
+    owner: document.owner,
+    mimeType: document.mimeType,
+  };
+}
+
 function getOwner(req) {
   return req.user?.id || process.env.DMS_DEFAULT_OWNER_ID || 'default';
 }
@@ -15,22 +26,31 @@ async function upload(req, res, next) {
   }
 
   try {
-    const document = await documentService.createDocument(req.file, getOwner(req));
-    return res.status(201).json(document);
+    const file = req.file;
+    const document = await documentService.createDocument({
+      id: file.filename,
+      originalName: file.originalname,
+      size: file.size,
+      mimeType: file.mimetype,
+      storageName: file.filename,
+      filePath: file.path,
+    }, getOwner(req));
+    return res.status(201).json(toPublicDocument(document));
   } catch (error) {
     return next(error);
   }
 }
 
 function list(req, res) {
-  return res.json(documentService.listDocuments(getOwner(req)));
+  const documents = documentService.listDocuments(getOwner(req));
+  return res.json(documents.map(toPublicDocument));
 }
 
 async function download(req, res, next) {
   try {
-    const result = await documentService.getDocumentForDownload(req.params.id, getOwner(req));
+    const document = await documentService.getDocumentForDownload(req.params.id, getOwner(req));
 
-    if (!result) {
+    if (!document) {
       return res.status(404).json({
         error: {
           code: 'DOCUMENT_NOT_FOUND',
@@ -39,7 +59,7 @@ async function download(req, res, next) {
       });
     }
 
-    return res.download(result.filePath, result.document.originalName, (error) => {
+    return res.download(document.filePath, document.originalName, (error) => {
       if (!error || res.headersSent) {
         return;
       }

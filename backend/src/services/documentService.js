@@ -1,44 +1,33 @@
 const documentRepository = require('../repositories/documentRepository');
 
-function toPublicDocument(document) {
-  return {
-    id: document.id,
-    originalName: document.originalName,
-    size: document.size,
-    uploadedAt: document.uploadedAt,
-    owner: document.owner,
-    mimeType: document.mimeType,
-  };
-}
-
-async function createDocument(file, owner) {
+async function createDocument(upload, owner) {
   const document = {
-    id: file.filename,
-    originalName: file.originalname,
-    size: file.size,
+    id: upload.id,
+    originalName: upload.originalName,
+    size: upload.size,
     uploadedAt: new Date().toISOString(),
     owner,
-    mimeType: file.mimetype,
-    storageName: file.filename,
-    filePath: file.path,
+    mimeType: upload.mimeType,
+    storageName: upload.storageName,
+    filePath: upload.filePath,
   };
 
   try {
     documentRepository.save(document);
   } catch (error) {
     try {
-      await documentRepository.removeFile(file.path);
+      await documentRepository.removeFile(upload.filePath);
     } catch {
       // Preserva o erro original do registro dos metadados.
     }
     throw error;
   }
 
-  return toPublicDocument(document);
+  return document;
 }
 
 function listDocuments(owner) {
-  return documentRepository.findByOwner(owner).map(toPublicDocument);
+  return documentRepository.findByOwner(owner);
 }
 
 async function getDocumentForDownload(id, owner) {
@@ -48,10 +37,7 @@ async function getDocumentForDownload(id, owner) {
     return null;
   }
 
-  return {
-    document: toPublicDocument(document),
-    filePath: document.filePath,
-  };
+  return document;
 }
 
 module.exports = {
